@@ -20,6 +20,7 @@ QtObject {
     property color assistantColor: "#10a37f"
     property color linkColor: "#55aaff"
     property color tabBorder: "#2c2d35"
+    property color grayedOutField: "#2b2c35"
     property real  fontSizeLarge: Qt.application.font.pixelSize
     property real  fontSizeLarger: Qt.application.font.pixelSize + 2
 }

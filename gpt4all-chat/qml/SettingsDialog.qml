@@ -39,6 +39,9 @@ Dialog {
     property real defaultTemperature: 0.7
     property real defaultTopP: 0.1
     property int defaultTopK: 40
+    property bool defaultUseMirostat: true
+    property real defaultMiroLearn: 0.1
+    property real defaultMiroEntropy: 5.0
     property int defaultMaxLength: 4096
     property int defaultPromptBatchSize: 128
     property real defaultRepeatPenalty: 1.18
@@ -56,6 +59,9 @@ Dialog {
     property alias temperature: settings.temperature
     property alias topP: settings.topP
     property alias topK: settings.topK
+    property alias useMirostat: settings.useMirostat
+    property alias miroLearn: settings.miroLearn
+    property alias miroEntropy: settings.miroEntropy
     property alias maxLength: settings.maxLength
     property alias promptBatchSize: settings.promptBatchSize
     property alias promptTemplate: settings.promptTemplate
@@ -73,6 +79,9 @@ Dialog {
         property real temperature: settingsDialog.defaultTemperature
         property real topP: settingsDialog.defaultTopP
         property int topK: settingsDialog.defaultTopK
+        property bool useMirostat: settingsDialog.defaultUseMirostat
+        property real miroLearn: settingsDialog.defaultMiroLearn
+        property real miroEntropy: settingsDialog.defaultMiroEntropy
         property int maxLength: settingsDialog.defaultMaxLength
         property int promptBatchSize: settingsDialog.defaultPromptBatchSize
         property int threadCount: settingsDialog.defaultThreadCount
@@ -90,6 +99,9 @@ Dialog {
         settings.temperature = defaultTemperature
         settings.topP = defaultTopP
         settings.topK = defaultTopK
+        settings.useMirostat = defaultUseMirostat
+        settings.miroLearn = defaultMiroLearn
+        settings.miroEntropy = defaultMiroEntropy
         settings.maxLength = defaultMaxLength
         settings.promptBatchSize = defaultPromptBatchSize
         settings.promptTemplate = defaultPromptTemplate
@@ -296,10 +308,96 @@ Dialog {
                 GridLayout {
                     id: generationSettingsTabInner
                     anchors.margins: 10
-                    columns: 2
+                    columns: 5
                     rowSpacing: 10
-                    columnSpacing: 10
+                    columnSpacing: 20
                     anchors.fill: parent
+
+                    Label {
+                        id: useMirostatLabel
+                        text: qsTr("Use Mirostat:")
+                        color: theme.textColor
+                        Layout.row: 0
+                        Layout.column: 2
+                    }
+                    MyCheckBox {
+                        id: useMirostatBox
+                        Layout.row: 0
+                        Layout.column: 3
+                        ToolTip.text: qsTr("Mirostat allows models to generate high quality text without the need to manually adjust Top P and Top K")
+                        ToolTip.visible: hovered
+                        checked: settingsDialog.useMirostat
+                        onClicked: {
+                            settingsDialog.useMirostat = useMirostatBox.checked
+                            settings.sync()
+
+                        }
+                    }
+                    Label {
+                        id: miroLearnLabel
+                        text: qsTr("Mirostat Learning Rate:")
+                        color: theme.textColor
+                        Layout.row: 1
+                        Layout.column: 2
+                    }
+
+                    MyTextField {
+                        text: settings.miroLearn.toString()
+                        color: theme.textColor
+                        ToolTip.text: qsTr("Influences how quickly the algorithm responds to feedback from the generated text, higher values = faster, lower = slower, default 0.1")
+                        ToolTip.visible: hovered
+                        Layout.row: 1
+                        Layout.column: 3
+                        validator: DoubleValidator {
+                            locale: "C"
+                        }
+                        onEditingFinished: {
+                            var val = parseFloat(text)
+                            if (!isNaN(val)) {
+                                settings.miroLearn = val
+                                settings.sync()
+                                focus = false
+                            } else {
+                                text = settings.miroLearn.toString()
+                            }
+                        }
+                        Accessible.role: Accessible.EditableText
+                        Accessible.name: miroLearnLabel.text
+                        Accessible.description: ToolTip.text
+                    }
+
+                    Label {
+                    id: miroEntropyLabel
+                    text: qsTr("Mirostat Target Entropy:")
+                    color: theme.textColor
+                    Layout.row: 2
+                    Layout.column: 2
+                    }
+
+                    MyTextField {
+                        text: settings.miroEntropy.toString()
+                        color: theme.textColor
+                        ToolTip.text: qsTr("Controls the balance between focus and diversity in the generated text. Lower value = more focused text, higher value = more creative text. Default 5.0")
+                        ToolTip.visible: hovered
+                        Layout.row: 2
+                        Layout.column: 3
+                        validator: DoubleValidator {
+                            locale: "C"
+                        }
+                        onEditingFinished: {
+                            var val = parseFloat(text)
+                            if (!isNaN(val)) {
+                                settings.miroEntropy = val
+                                settings.sync()
+                                focus = false
+                            } else {
+                                text = settings.miroEntropy.toString()
+                            }
+                        }
+                    Accessible.role: Accessible.EditableText
+                    Accessible.name: miroEntropyLabel.text
+                    Accessible.description: ToolTip.text
+                    }
 
                     Label {
                         id: tempLabel
@@ -311,7 +409,7 @@ Dialog {
                     MyTextField {
                         text: settings.temperature.toString()
                         color: theme.textColor
-                        ToolTip.text: qsTr("Temperature increases the chances of choosing less likely tokens.\nNOTE: Higher temperature gives more creative but less predictable outputs.")
+                        ToolTip.text: qsTr("Temperature adjusts creativity and focus of the model. Higher temperatures (e.g., 1.2) increase randomness in the response, helping creativity.\nLower temperatures (e.g., 0.4) provide more focused and coherent results. Recommended range: 0.6 - 0.85. Default: 0.7")
                         ToolTip.visible: hovered
                         Layout.row: 0
                         Layout.column: 1
@@ -340,12 +438,20 @@ Dialog {
                         Layout.column: 0
                     }
                     MyTextField {
+                        id: topPField
                         text: settings.topP.toString()
-                        color: theme.textColor
-                        ToolTip.text: qsTr("Only the most likely tokens up to a total probability of top_p can be chosen.\nNOTE: Prevents choosing highly unlikely tokens, aka Nucleus Sampling")
+                        enabled: !useMirostatBox.checked //if mirostat is enabled, TopP and TopK are ignored
+                        color: topPField.enabled ? theme.textColor : theme.mutedTextColor
+                        ToolTip.text: topKField.enabled ? "Top P controls token selection based on probability. Only the most likely tokens up to a total probability of Top P can be chosen.\nHelps avoid selecting highly unlikely tokens (also celled Nucleus Sampling). Default: 0.1" : "Mirostat is enabled"
                         ToolTip.visible: hovered
                         Layout.row: 1
                         Layout.column: 1
+                        padding: 10
+                        background: Rectangle {
+                            implicitWidth: 150
+                            color: topPField.enabled ? theme.backgroundAccent : theme.grayedOutField
+                            radius: 10
+                            }
                         validator: DoubleValidator {
                             locale: "C"
                         }
@@ -371,12 +477,19 @@ Dialog {
                         Layout.column: 0
                     }
                     MyTextField {
+                        id: topKField
                         text: settings.topK.toString()
-                        color: theme.textColor
-                        ToolTip.text: qsTr("Only the top K most likely tokens will be chosen from")
+                        enabled: !useMirostatBox.checked //if mirostat is enabled, TopP and TopK are ignored
+                        color: topKField.enabled ? theme.textColor : theme.mutedTextColor
+                        ToolTip.text: topKField.enabled ? "Only the Top K most likely tokens are considered for selection.\n Helps focus on the most probable choices and discard less probable options. Default: 40" : "Mirostat is enabled"
                         ToolTip.visible: hovered
                         Layout.row: 2
                         Layout.column: 1
+                        background: Rectangle {
+                            implicitWidth: 150
+                            color: topKField.enabled ? theme.backgroundAccent : theme.grayedOutField
+                            radius: 10
+                            }
                         validator: IntValidator {
                             bottom: 1
                         }
@@ -549,6 +662,7 @@ Dialog {
                     Rectangle {
                         Layout.row: 7
                         Layout.column: 1
+                        Layout.columnSpan: 4
                         Layout.fillWidth: true
                         height: 200
                         color: "transparent"
@@ -572,7 +686,7 @@ Dialog {
                                         settings.promptTemplate = text
                                         settings.sync()
                                     }
-                                }
+                               }
                                 bottomPadding: 10
                                 Accessible.role: Accessible.EditableText
                                 Accessible.name: promptTemplateLabel.text
@@ -585,6 +699,7 @@ Dialog {
                     MyButton {
                         Layout.row: 8
                         Layout.column: 1
+                        Layout.columnSpan: 4
                         Layout.fillWidth: true
                         text: qsTr("Restore Defaults")
                         Accessible.description: qsTr("Restores the settings dialog to a default state")
