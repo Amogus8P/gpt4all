@@ -330,7 +330,6 @@ Dialog {
                         onClicked: {
                             settingsDialog.useMirostat = useMirostatBox.checked
                             settings.sync()
-
                         }
                     }
                     Label {
@@ -442,7 +441,7 @@ Dialog {
                         text: settings.topP.toString()
                         enabled: !useMirostatBox.checked //if mirostat is enabled, TopP and TopK are ignored
                         color: topPField.enabled ? theme.textColor : theme.mutedTextColor
-                        ToolTip.text: topKField.enabled ? "Top P controls token selection based on probability. Only the most likely tokens up to a total probability of Top P can be chosen.\nHelps avoid selecting highly unlikely tokens (also celled Nucleus Sampling). Default: 0.1" : "Mirostat is enabled"
+                        ToolTip.text: topKField.enabled ? "Top P controls token selection based on probability. Only the most likely tokens up to a total probability of Top P can be chosen.\nHelps avoid selecting highly unlikely tokens (also called Nucleus Sampling). Default: 0.1" : "Mirostat is enabled"
                         ToolTip.visible: hovered
                         Layout.row: 1
                         Layout.column: 1
@@ -481,7 +480,7 @@ Dialog {
                         text: settings.topK.toString()
                         enabled: !useMirostatBox.checked //if mirostat is enabled, TopP and TopK are ignored
                         color: topKField.enabled ? theme.textColor : theme.mutedTextColor
-                        ToolTip.text: topKField.enabled ? "Only the Top K most likely tokens are considered for selection.\n Helps focus on the most probable choices and discard less probable options. Default: 40" : "Mirostat is enabled"
+                        ToolTip.text: topKField.enabled ? "Only the Top K most likely tokens are considered for selection.\nHelps focus on the most probable choices and discard less probable options. Default: 40" : "Mirostat is enabled"
                         ToolTip.visible: hovered
                         Layout.row: 2
                         Layout.column: 1
